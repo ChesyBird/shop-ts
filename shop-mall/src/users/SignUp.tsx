@@ -1,8 +1,9 @@
 import { useState } from "react";
 import type { SignUpForm } from "../types/user";
 import { useUser } from "../context/UserContext";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 
+// 폼 초기화 값
 const initialForm: SignUpForm = {
     username: "",
     password: "",
@@ -11,10 +12,14 @@ const initialForm: SignUpForm = {
     email: ""
 }
 
+// 유효성 검사 정규식
+const USERNAME_REGEX = /^(?=.*[a-z])(?=.*\d)[a-z0-9]{4,12}$/;
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 const SignUp = () => {
     const [form, setForm] = useState<SignUpForm>(initialForm);
     const [error, setError] = useState<string | null>(null);
-    const { signup } = useUser();
+    const { users, signup } = useUser();
     const navigate = useNavigate();
 
     // 폼에 입력된 값 받기
@@ -31,12 +36,17 @@ const SignUp = () => {
         e.preventDefault(); // 기본동작 막기
 
         // 유효성 검사
-        if(!username){
-            setError("아이디를 입력하세요");
+        if(!USERNAME_REGEX.test(username)){
+            setError("영문 소문자와 숫자를 포함한 4~12자 아이디를 입력하세요");
             return;
         }
-        if(!password){
-            setError("비밀번호를 입력하세요");
+        // some() : 배열 요소 중 하나라도 조건을 만족하는지 검사
+        if(users.some(user => user.username === username)){
+            setError("이미 사용 중인 아이디입니다");
+            return;
+        }
+        if(password.length < 8){
+            setError("8자 이상 비밀번호를 입력하세요");
             return;
         }
         if(password !== passwordConfirm){
@@ -47,8 +57,8 @@ const SignUp = () => {
             setError("이름을 입력하세요");
             return;
         }
-        if(!email){
-            setError("이메일을 입력하세요");
+        if(!EMAIL_REGEX.test(email.trim())){
+            setError("올바른 형식의 이메일을 입력하세요");
             return;
         }
 
@@ -76,7 +86,7 @@ const SignUp = () => {
                         id="username"
                         name="username"
                         value={username}
-                        placeholder="아이디를 입력해주세요"
+                        placeholder="영문 소문자, 숫자 포함 4~12자"
                         onChange={handleInputChange}
                     />
                 </div>
@@ -120,13 +130,16 @@ const SignUp = () => {
                         id="email"
                         name="email"
                         value={email}
-                        placeholder="이메일을 입력해주세요"
+                        placeholder="example@test.com"
                         onChange={handleInputChange}
                     />
                 </div>
                 {error && 
                 <p className="sign-up_error">{error}</p>}
                 <button type="submit">등록</button>
+                <p className="signup-link">
+                    이미 계정이 있으신가요? <Link to='/signin'>로그인</Link>
+                </p>
             </form>
         </div>
     )
