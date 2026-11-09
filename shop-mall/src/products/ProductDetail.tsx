@@ -2,6 +2,8 @@ import { Link, useParams } from "react-router-dom";
 import { useProduct } from "../context/ProductContext";
 import { useCart } from "../context/CartContext";
 
+const NO_IMAGE = "/images/no-image.png"
+
 const ProductDetail = () => {
     const {id} = useParams<{id: string}>();
     const {products} = useProduct();
@@ -22,6 +24,11 @@ const ProductDetail = () => {
                 상품을 찾지 못해 undefined일때 오류 대신 undefined를 돌려줌 */}
             <Link to='/' className="product-detail_back">↩</Link>
             <span className="product-detail_category">{product?.category}</span>
+            <img
+                className="product-detail_img"
+                src={product.image ?? NO_IMAGE}
+                alt={product.pName}
+            />
             <h2>{product?.pName}</h2>
             <p className="product-detail_price">{product?.price.toLocaleString()} 원</p>
             <p className="product-detail_desc">{product?.description}</p>
