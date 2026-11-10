@@ -99,6 +99,52 @@ app.put("/api/products/:id", async (req, res) => {
     }
 })
 
+// 회원 목록
+app.get("/api/users", async (req, res) => {
+    const sql = "SELECT * FROM users"
+    try {
+        const result = await db.query(sql);
+        res.json(result.rows); // 요청한 곳으로 데이터 반환
+    } catch (error) {
+        console.error("회원 목록 조회 오류!!", err);
+        res.send("회원 목록 조회 오류!!");
+    }
+})
+
+// 로그인
+app.post("/api/users/login", async (req, res) => {
+    const { username, password } = req.body;
+    const sql = "SELECT * FROM users WHERE "
+          + "username = $1 AND password = $2";
+    try {
+        const result = await db.query(sql, [username, password]);
+        if(result.rows.length === 0){
+            return res.send("아이디 또는 비밀번호가 일치하지 않습니다.");
+        }
+        res.json({
+            message: "로그인 성공",
+            user: result.rows[0]
+        }); // 요청한 곳으로 데이터 반환
+    } catch (error) {
+        console.error("회원 로그인 중 오류!!", err);
+        res.send("회원 로그인 중 오류!!");
+    }
+})
+
+// 회원가입
+app.post("/api/users", async (req, res) => {
+    const { username, password, name, email } = req.body;
+    const sql = "INSERT INTO users(username, password, name, email) "
+                + "VALUES ($1, $2, $3, $4)";
+    try {
+        await db.query(sql, [username, password, name, email]);
+        res.send("회원가입 완료!"); // 요청한 곳으로 데이터 반환
+    } catch (error) {
+        console.error("회원가입 중 오류!!", err);
+        res.send("회원가입 중 오류!!");
+    }
+})
+
 // 서버 실행
 app.listen(PORT, () => {
     console.log(`서버 실행중... http://localhost:${PORT}`);

@@ -1,29 +1,34 @@
-import { useState } from "react";
-import { initialUsers } from "../datas/users";
+import { useEffect, useState } from "react";
 import type { LoginForm, NewUser, User } from "../types/user";
 import { UserContext } from "./UserContext";
+import { getUsers, requestLogin, createUser } from "../api/users";
 
 const UserProvider = ({children} : {children: React.ReactNode}) => {
-    const [ users, setUsers ] = useState<User[]>(initialUsers);
+    const [ users, setUsers ] = useState<User[]>([]);
     const [currentUser, setCurrentUser] = useState<User | null>(null);
 
+    // 회원 목록 조회
+    useEffect(() => {
+        getUsers()
+        .then(setUsers)
+        .catch(err => console.log("회원 목록 조회 오류", err))
+    }, []);
+
     // 회원가입 함수
-    const signup = ( newUser: NewUser )=>{
-        // 가입한 1명 회원
-        const user: User = {...newUser, id: Date.now()}
-        setUsers([...users, user])
+    const signup = async ( newUser: NewUser )=>{
+        await createUser(newUser);  // DB에 저장
+        setUsers(await getUsers()); // 회원목록에 가져오기
     }
 
     // 로그인 함수
-    const login = (loginForm: LoginForm) => {
-        // 회원 목록에서 한 명의 회원을 찾기
-        const found = users.find(user =>
-            user.username === loginForm.username &&
-            user.password === loginForm.password
-        )
-        if(!found) return false; // 회원이 없는 경우
-        setCurrentUser(found); // 회원이 있는 경우 true 반환
-        return true;
+    const login = async (loginForm: LoginForm) => {
+        try {
+            const user = await requestLogin(loginForm);
+            setCurrentUser(user); // 로그인 한 유저 저장
+            return true;
+        } catch {
+            return false;
+        }
     }
 
     // 로그아웃 함수

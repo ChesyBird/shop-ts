@@ -1,5 +1,5 @@
 // 서버와 연결할 파일
-import type { Category, Product } from "../types/product";
+import type { Category, NewProduct, Product } from "../types/product";
 import api from "./api";
 
 // 서버(DB)에서 원하는 데이터 타입을 정의
@@ -26,4 +26,15 @@ const toProduct = (row: ProductRow) : Product => ({
 export const getProducts = async () => {
     const response = await api.get<ProductRow[]>('/products');
     return response.data.map(toProduct);
+}
+
+// 상품 등록(폼 필드에 입력된 값을 DB로 넘김)
+export const createProduct = async (product: NewProduct) => {
+    await api.post("/products", {
+        pName: product.pName,
+        category: product.category,
+        price: product.price,
+        description: product.description,
+        image: product.image
+    })
 }
