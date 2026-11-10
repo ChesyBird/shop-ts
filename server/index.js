@@ -1,9 +1,13 @@
 import express from 'express'
 import pg from 'pg'
+import cors from 'cors'
 
 // 앱 객체 생성
 const app = express();
 const PORT = 8000;
+
+// cors : 요청하는 모든 주소 허용
+app.use(cors());
 
 // 본문요청 파싱 : 회원가입, 상품등록 등
 app.use(express.json());
