@@ -16,4 +16,8 @@ INSERT INTO users (username, password, name, email, role) VALUES
   ('admin0', 'a1234567', '관리자', 'admin0@spaceshop.com', 'admin'),
   ('ko12',  'k1234567',  '고담덕', 'ko12@example.com',  'user');
 
+UPDATE users SET role='admin' WHERE id=1;
+
 SELECT * FROM users;
+
+DROP TABLE users;

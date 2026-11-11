@@ -1,6 +1,7 @@
 import express from 'express'
 import pg from 'pg'
 import cors from 'cors'
+import bcrypt from 'bcrypt'
 
 // 앱 객체 생성
 const app = express();
@@ -40,7 +41,8 @@ app.get("/api/products", async (req, res) => {
         res.json(result.rows); // 요청한 곳으로 반환
     } catch (err) {
         console.error("상품 목록 조회 오류!!", err);
-        res.send("상품 목록 조회 오류!!");
+        // 500: 코드 오류
+        res.status(500).send("상품 목록 조회 오류!!");
     }
 })
 
@@ -53,7 +55,7 @@ app.get("/api/products/:id", async (req, res) => {
         res.json(result.rows[0]); // 요청한 곳으로 반환
     } catch (err) {
         console.error("상품 조회 오류!!", err);
-        res.send("상품 조회 오류!!");
+        res.status(500).send("상품 조회 오류!!");
     }
 })
 
@@ -67,7 +69,7 @@ app.post("/api/products", async (req, res) => {
         res.send("상품 등록 완료!!");
     } catch (err) {
         console.error("상품 등록 오류!!", err);
-        res.send("상품 등록 오류!!");
+        res.status(500).send("상품 등록 오류!!");
     }
 })
 
@@ -80,7 +82,7 @@ app.delete("/api/products/:id", async (req, res) => {
         res.send("상품 삭제 완료!!")
     } catch (err) {
         console.error("상품 삭제 오류!!", err);
-        res.send("상품 삭제 오류!!");
+        res.status(500).send("상품 삭제 오류!!");
     }
 })
 
@@ -95,7 +97,7 @@ app.put("/api/products/:id", async (req, res) => {
         res.send("상품 수정 완료!!");
     } catch (err) {
         console.error("상품 수정 오류!!", err);
-        res.send("상품 수정 오류!!");
+        res.status(500).send("상품 수정 오류!!");
     }
 })
 
@@ -107,29 +109,30 @@ app.get("/api/users", async (req, res) => {
         res.json(result.rows); // 요청한 곳으로 데이터 반환
     } catch (error) {
         console.error("회원 목록 조회 오류!!", err);
-        res.send("회원 목록 조회 오류!!");
+        res.status(500).send("회원 목록 조회 오류!!");
     }
 })
 
 // 로그인
-app.post("/api/users/login", async (req, res) => {
-    const { username, password } = req.body;
-    const sql = "SELECT * FROM users WHERE "
-          + "username = $1 AND password = $2";
-    try {
-        const result = await db.query(sql, [username, password]);
-        if(result.rows.length === 0){
-            return res.send("아이디 또는 비밀번호가 일치하지 않습니다.");
-        }
-        res.json({
-            message: "로그인 성공",
-            user: result.rows[0]
-        }); // 요청한 곳으로 데이터 반환
-    } catch (error) {
-        console.error("회원 로그인 중 오류!!", err);
-        res.send("회원 로그인 중 오류!!");
-    }
-})
+// app.post("/api/users/login", async (req, res) => {
+//     const { username, password } = req.body;
+//     const sql = "SELECT * FROM users WHERE "
+//           + "username = $1 AND password = $2";
+//     try {
+//         const result = await db.query(sql, [username, password]);
+//         if(result.rows.length === 0){
+//             // 401: 인증실패 / 404: 페이지를 찾을 수 없음
+//             return res.status(401).send("아이디 또는 비밀번호가 일치하지 않습니다.");
+//         }
+//         res.json({
+//             message: "로그인 성공",
+//             user: result.rows[0]
+//         }); // 요청한 곳으로 데이터 반환
+//     } catch (error) {
+//         console.error("회원 로그인 중 오류!!", err);
+//         res.status(500).send("회원 로그인 중 오류!!");
+//     }
+// })
 
 // 회원가입
 app.post("/api/users", async (req, res) => {
@@ -137,11 +140,39 @@ app.post("/api/users", async (req, res) => {
     const sql = "INSERT INTO users(username, password, name, email) "
                 + "VALUES ($1, $2, $3, $4)";
     try {
-        await db.query(sql, [username, password, name, email]);
+        // 비밀번호 암호화(해시)해서 저장. 10: 암호화 반복 정도
+        const hashedPwd = await bcrypt.hash(password, 10);
+        await db.query(sql, [username, hashedPwd, name, email]);
         res.send("회원가입 완료!"); // 요청한 곳으로 데이터 반환
     } catch (error) {
         console.error("회원가입 중 오류!!", err);
-        res.send("회원가입 중 오류!!");
+        res.status(500).send("회원가입 중 오류!!");
+    }
+})
+
+// 로그인(ver.비번암호화)
+app.post("/api/users/login", async (req, res) => {
+    const { username, password } = req.body;
+    const sql = "SELECT * FROM users WHERE username = $1";
+    try {
+        const result = await db.query(sql, [username]);
+        const user = result.rows[0];
+        // 회원이 없거나 입력한 비밀번호가 저장된 해시와 맞지 않으면 실패
+        if(!user || !(await bcrypt.compare(password, user.password))){
+            return res.status(401).send("아이디 또는 비밀번호가 일치하지 않습니다.");
+        }
+
+        // 응답에서 비밀번호를 빼고 나머지만 보낸다.
+        // userInfo: id, username, name, email, role
+        const { password: _, ...userInfo } = user;
+
+        res.json({
+            message: "로그인 성공",
+            user: result.rows[0]
+        }); // 요청한 곳으로 데이터 반환
+    } catch (error) {
+        console.error("회원 로그인 중 오류!!", err);
+        res.status(500).send("회원 로그인 중 오류!!");
     }
 })
 
