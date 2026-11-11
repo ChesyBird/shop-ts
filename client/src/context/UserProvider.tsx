@@ -5,7 +5,7 @@ import { getUsers, requestLogin, createUser } from "../api/users";
 
 const UserProvider = ({children} : {children: React.ReactNode}) => {
     const [ users, setUsers ] = useState<User[]>([]);
-    const [currentUser, setCurrentUser] = useState<User | null>(null);
+    const [ currentUser, setCurrentUser ] = useState<User | null>(null);
 
     // 회원 목록 조회
     useEffect(() => {
