@@ -19,9 +19,9 @@ const Header = () => {
     }
 
     // 로그아웃 시 장바구니 비우기
-    const handleLogout = () => {
+    const handleLogout = async () => {
+        await logout();
         clearCart();
-        logout();
         navigate('/');
     }
 

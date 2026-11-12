@@ -4,7 +4,12 @@ import { useUser } from "../context/UserContext";
 
 const AdminPage = () => {
     const { products } = useProduct();
-    const { users } = useUser();
+    const { users, isAuthLoading } = useUser();
+
+    // 로그인 상태 확인하는 동안 기다림(새로고침 직후)
+    if(isAuthLoading){
+        return <div>불러오는 중...</div>
+    }
 
     // 관리자 수 계산
     const adminCnt = users.filter(user => user.role === "admin").length;

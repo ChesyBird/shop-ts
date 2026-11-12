@@ -2,16 +2,54 @@ import express from 'express'
 import pg from 'pg'
 import cors from 'cors'
 import bcrypt from 'bcrypt'
+import session from 'express-session'
 
 // 앱 객체 생성
 const app = express();
 const PORT = 8000;
 
-// cors : 요청하는 모든 주소 허용
-app.use(cors());
+// cors() : 요청하는 모든 주소 허용
+// 세션이 들어가면 써줘야함
+app.use(cors({
+    origin: "http://localhost:5173",
+    credentials: true   // 자격
+}));
+
+// 세션 설정
+/* 쿠키 : 서버 메모리가 브라우저에 맡겨두는 작은 값
+   같은 서버로 요청할 때마다 자동으로 함께 보낸다
+   세션 방식은 쿠키에 회원정보가 아니라 세션ID(번호표)만 넣고
+   실제 회원정보는 서버가 가지고있다
+   서버를 다시 시작하면 모든 세션이 사라진다 - 다시 로그인
+*/
+app.use(session({
+    secret: "space-shop-secret",    // 비밀키(세션 ID : 쿠키). 문자열이면 아무거나 ㅇㅋ
+    resave: false,                  // 바뀐 곳이 없으면 다시 저장 X
+    saveUninitialized: false,       // 로그인하기 전에는 세션을 만들지 않음
+    cookie: {
+        httpOnly: true,             // 쿠키를 읽을 수 없게 함
+        maxAge: 1000 * 60 * 60      // ms * 60초 * 60분 : 1시간 
+    }
+}))
 
 // 본문요청 파싱 : 회원가입, 상품등록 등
 app.use(express.json());
+
+// 로그인 확인함수
+const requireLogin = (req, res, next) => {
+    if(!req.session.user){
+        return res.status(401).send("로그인이 필요합니다.")
+    }
+    next();
+}
+
+// 관리자 확인함수
+const requireAdmin = (req, res, next) => {
+    if(req.session.user?.role !== "admin"){
+        return res.status(403).send("관리자만 이용 가능합니다.")
+    }
+    next();
+}
 
 // DB연결
 const db = new pg.Client({
@@ -60,7 +98,7 @@ app.get("/api/products/:id", async (req, res) => {
 })
 
 // 상품 등록
-app.post("/api/products", async (req, res) => {
+app.post("/api/products", requireAdmin, async (req, res) => {
     const { pName, category, price, description, image } = req.body;
     const sql = "INSERT INTO products(p_name, category, price, description, image) "
                 + "VALUES ($1, $2, $3, $4, $5)";
@@ -74,7 +112,7 @@ app.post("/api/products", async (req, res) => {
 })
 
 // 상품 삭제
-app.delete("/api/products/:id", async (req, res) => {
+app.delete("/api/products/:id", requireAdmin, async (req, res) => {
     const pid = req.params.id; // id 받아오기
     const sql = "DELETE FROM products WHERE id = $1";
     try {
@@ -87,7 +125,7 @@ app.delete("/api/products/:id", async (req, res) => {
 })
 
 // 상품 수정
-app.put("/api/products/:id", async (req, res) => {
+app.put("/api/products/:id", requireAdmin, async (req, res) => {
     const pid = req.params.id; // id 받아오기
     const { pName, category, price, description, image } = req.body;
     const sql = "UPDATE products SET p_name = $1, category = $2, price = $3, "
@@ -165,6 +203,7 @@ app.post("/api/users/login", async (req, res) => {
         // 응답에서 비밀번호를 빼고 나머지만 보낸다.
         // userInfo: id, username, name, email, role
         const { password: _, ...userInfo } = user;
+        req.session.user = userInfo;    // 세션에 로그인 정보 저장
 
         res.json({
             message: "로그인 성공",
@@ -173,6 +212,48 @@ app.post("/api/users/login", async (req, res) => {
     } catch (error) {
         console.error("회원 로그인 중 오류!!", err);
         res.status(500).send("회원 로그인 중 오류!!");
+    }
+})
+
+// 로그인 확인 : 새로고침해도 세션에 남아있는 회원정보를 돌려준다
+app.get("/api/users/me", requireLogin, (req, res) => {
+    res.json(req.session.user);
+})
+
+// 로그아웃: 서버의 세션을 지우고 쿠키도 지운다
+app.post("/api/users/logout", (req, res) => {
+    req.session.destroy(() => { // 세션 삭제
+        res.clearCookie("connect.id");
+        res.send("로그아웃 완료");
+    })
+})
+
+// 회원 정보 수정(이름, 이메일)
+app.put("/api/users/:id", requireLogin, async (req, res) => {
+    if(req.session.user.id !== Number(req.params.id)){
+        return res.status(403).send("본인 정보만 수정할 수 있습니다.")
+    }
+    const uid = req.params.id;
+    const { name, email } = req.body;
+
+    // RETURNING : PostgreSQL의 기능. 수정한 데이터를 검색하는 용어.
+    const sql = "UPDATE users SET name = $1, email = $2 WHERE id = $3"
+                +   " RETURNING id, username, name, email, role, created_at";
+    
+    try {
+        const result = await db.query(sql, [ name, email, uid ]);
+        if(result.rows.length === 0){
+            return res.status(404).send("회원을 찾을 수 없습니다.");
+        }
+        req.session.user = result.rows[0];  // 세션의 회원정보값
+        res.json(result.rows[0]);   // 변경된 정보 반환
+    } catch (error) {
+        // email - UNIQUE 위반 : 23505
+        if(err.code === "23505"){
+            return res.status(409).send("이미 사용중인 이메일입니다.")
+        }
+        console.error("회원정보 변경 중 오류!!", err);
+        res.status(500).send("회원정보 변경 중 오류!!");
     }
 })
 

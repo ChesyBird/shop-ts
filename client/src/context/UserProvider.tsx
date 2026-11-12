@@ -1,11 +1,20 @@
 import { useEffect, useState } from "react";
-import type { LoginForm, NewUser, User } from "../types/user";
+import type { LoginForm, NewUser, User, UserUpdateForm } from "../types/user";
 import { UserContext } from "./UserContext";
-import { getUsers, requestLogin, createUser } from "../api/users";
+import {
+    getUsers,
+    requestLogin,
+    createUser,
+    modifyUser,
+    getMe,
+    requestLogout
+} from "../api/users";
 
 const UserProvider = ({children} : {children: React.ReactNode}) => {
     const [ users, setUsers ] = useState<User[]>([]);
     const [ currentUser, setCurrentUser ] = useState<User | null>(null);
+    // 로그인 인증 상태 확인 여부
+    const [ isAuthLoading, setIsAuthLoading ] = useState<boolean>(true);
 
     // 회원 목록 조회
     useEffect(() => {
@@ -31,18 +40,37 @@ const UserProvider = ({children} : {children: React.ReactNode}) => {
         }
     }
 
+    // 새로고침해도 로그인 유지
+    useEffect(() => {
+        getMe()
+            .then(setCurrentUser)
+            .catch(() => setCurrentUser(null))
+            .finally(() => setIsAuthLoading(false))
+    });
+
     // 로그아웃 함수
-    const logout = () => {
+    const logout = async () => {
+        await requestLogout();
         setCurrentUser(null);
+    }
+
+    // 회원정보 변경 함수
+    const updateUser = async (form: UserUpdateForm) => {
+        if(!currentUser) return; 
+        const updateUser = await modifyUser(currentUser?.id, form);
+        setCurrentUser(updateUser); // 헤더의 이름이 바로 변경됨
+        setUsers(await getUsers()); // 회원 배열에 저장
     }
 
     return(
         <UserContext.Provider value={{
             users,
             currentUser,
+            isAuthLoading,
             signup,
             login,
-            logout
+            logout,
+            updateUser
         }}>
             {children}
         </UserContext.Provider>

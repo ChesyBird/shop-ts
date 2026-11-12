@@ -28,3 +28,7 @@ export interface LoginForm{
     username: string;
     password: string;
 }
+
+// 회원 정보 수정
+// 아이디 바꾸지 않고 이름과 이메일만 수정
+export type UserUpdateForm = Pick<User, "name" | "email">
